@@ -7,6 +7,8 @@ try:
   import psana
 except ImportError:
   pass # for running at home without psdm build
+import legion
+import psana_legion
 from xfel.cftbx.detector import cspad_cbf_tbx
 from xfel.cxi.cspad_ana import cspad_tbx, rayonix_tbx
 import pycbf, os, sys, copy, socket
@@ -618,7 +620,12 @@ class InMemScript(DialsProcessScript):
       dataset_name += ":stream=%s"%(",".join(["%d"%stream for stream in params.input.stream]))
     if params.input.calib_dir is not None:
       psana.setOption('psana.calib-dir',params.input.calib_dir)
-    if params.mp.method == "mpi" and params.mp.mpi.method == 'client_server' and size > 2:
+
+    if True: # Hack: Force Legion code path for now
+      dataset_name_rax = dataset_name.replace(":smd",":rax")
+      ds = psana_legion.LegionDataSource(dataset_name_rax)
+
+    elif params.mp.method == "mpi" and params.mp.mpi.method == 'client_server' and size > 2:
       dataset_name_client = dataset_name.replace(":smd",":rax")
       # for client-server, master reads smd - clients read rax
       if rank == 0:
@@ -629,6 +636,7 @@ class InMemScript(DialsProcessScript):
     else:
       # for stripe, all cores read smd
       ds = psana.DataSource(dataset_name)
+
     if params.format.file_format == "cbf":
       self.psana_det = psana.Detector(params.input.address, ds.env())
 
@@ -638,7 +646,34 @@ class InMemScript(DialsProcessScript):
     else:
       max_events = params.dispatch.max_events
 
-    for run in ds.runs():
+    if True: # Hack: Force Legion code path for now
+      # FIXME: If you do this check, then you can't jump later because RAX mode thinks it's done iterating
+      # runs = list(ds_fake.runs())
+      # assert len(runs) == 1 # Hack: Right now this is only going to work on a single run
+      # run = runs[0]
+
+      run = next(ds.runs())
+
+      self.begin_run(params, run)
+
+      def analyze(evt):
+        try:
+          self.process_event(run, evt)
+        except Exception, e:
+          print "Rank %d unhandled exception processing event"%rank, str(e)
+      def teardown():
+        self.teardown(rank, params)
+
+      limit = int(os.environ['LIMIT']) if 'LIMIT' in os.environ else None
+      ds.start(analyze, teardown=teardown, limit=limit)
+    else:
+      for run in ds.runs():
+        self.begin_run(params, run)
+        self.main_event_loop(rank, size, run)
+      self.teardown(rank, params)
+
+  def begin_run(self, params, run):
+    if True: # Hack: Avoid large diff
       if params.format.file_format == "cbf":
         if params.format.cbf.mode == "cspad":
           # load a header only cspad cbf from the slac metrology
@@ -684,6 +719,8 @@ class InMemScript(DialsProcessScript):
       else:
         self.integration_mask = None
 
+  def main_event_loop(self, rank, size, run):
+    if True: # Hack: Avoid large diff
       # prepare fractions of process_percent, if given
       process_fractions = None
       if params.dispatch.process_percent:
@@ -769,6 +806,7 @@ class InMemScript(DialsProcessScript):
           last = mem
         print 'Total memory leaked in %d cycles: %dkB' % (nevent+1-50, mem - first)
 
+  def teardown(self, rank, params):
     print "Rank %d finalizing"%rank
     try:
       self.finalize()
@@ -1270,6 +1308,11 @@ class InMemScript(DialsProcessScript):
       self.params.output.reindexedstrong_filename        = os.path.join(self.params.output.output_dir, self.params.output.reindexedstrong_filename%("idx-" + s))
 
     super(InMemScript, self).finalize()
+
+# Hack: Pretend we're running the script directly (even though we're not).
+sys.argv = legion.input_args(filter_runtime_options=True)
+sys.argv = ["cctbx.xfel.xtc_process"] + sys.argv[1:]
+__name__ = "__main__"
 
 if __name__ == "__main__":
   from dials.util import halraiser
