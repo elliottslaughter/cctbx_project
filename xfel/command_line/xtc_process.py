@@ -7,6 +7,7 @@ try:
   import psana
 except ImportError:
   pass # for running at home without psdm build
+import os
 if os.environ.get('PSANA_FRAMEWORK') == 'mpi':
     import psana_mpi as psana_legion
     legion = None
