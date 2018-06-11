@@ -7,8 +7,12 @@ try:
   import psana
 except ImportError:
   pass # for running at home without psdm build
-import legion
-import psana_legion
+if os.environ.get('PSANA_FRAMEWORK') == 'mpi':
+    import psana_mpi as psana_legion
+    legion = None
+else:
+    import psana_legion
+    import legion
 from xfel.cftbx.detector import cspad_cbf_tbx
 from xfel.cxi.cspad_ana import cspad_tbx, rayonix_tbx
 import pycbf, os, sys, copy, socket
@@ -1288,9 +1292,10 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     super(InMemScript, self).finalize()
 
 # Hack: Pretend we're running the script directly (even though we're not).
-sys.argv = legion.input_args(filter_runtime_options=True)
-sys.argv = ["cctbx.xfel.xtc_process"] + sys.argv[1:]
-__name__ = "__main__"
+if legion is not None:
+  sys.argv = legion.input_args(filter_runtime_options=True)
+  sys.argv = ["cctbx.xfel.xtc_process"] + sys.argv[1:]
+  __name__ = "__main__"
 
 if __name__ == "__main__":
   from dials.util import halraiser
