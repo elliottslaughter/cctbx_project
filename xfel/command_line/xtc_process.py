@@ -663,6 +663,8 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
           self.process_event(run, evt)
         except Exception, e:
           print "Rank %d unhandled exception processing event"%rank, str(e)
+          import traceback
+          traceback.print_exc()
       def teardown():
         self.teardown(rank, params)
 
