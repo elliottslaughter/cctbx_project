@@ -873,6 +873,28 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     @param run psana run object
     @param timestamp psana timestamp object
     """
+
+    t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10 = 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+    def report_processing():
+      print("Processing for event took %e (%s)" % (
+        max(t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10) - t0,
+        ' '.join(['%e' % x for x in map(lambda x: max(x, 0),
+                                        [t1 - t0,
+                                         t2 - t1,
+                                         t3 - t2,
+                                         t4 - t3,
+                                         t5 - t4,
+                                         t6 - t5,
+                                         t7 - t6,
+                                         t8 - t7,
+                                         t9 - t8,
+                                         t10 - t9])])))
+      print("Raw timing values [%s]" % ', '.join(map(str, [t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10])))
+
+    import time as py_time
+    t0 = py_time.time()
+
     time = evt.get(psana.EventId).time()
     fid = evt.get(psana.EventId).fiducials()
 
@@ -882,9 +904,13 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     ts = cspad_tbx.evt_timestamp((sec,nsec/1e6))
     if ts is None:
       print "No timestamp, skipping shot"
+      t1 = py_time.time()
+      report_processing()
       return
 
     if len(self.params_cache.debug.event_timestamp) > 0 and ts not in self.params_cache.debug.event_timestamp:
+      t1 = py_time.time()
+      report_processing()
       return
     self.run = run
 
@@ -893,13 +919,19 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
         if self.known_events[ts] not in ["stop", "done", "fail"]:
           if self.params_cache.debug.skip_bad_events:
             print "Skipping event %s: possibly caused an unknown exception previously"%ts
+            t1 = py_time.time()
+            report_processing()
             return
         elif self.params_cache.debug.skip_processed_events:
           print "Skipping event %s: processed successfully previously"%ts
+          t1 = py_time.time()
+          report_processing()
           return
       else:
         if self.params_cache.debug.skip_unprocessed_events:
           print "Skipping event %s: not processed previously"%ts
+          t1 = py_time.time()
+          report_processing()
           return
 
     self.debug_start(ts)
@@ -907,10 +939,14 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     if evt.get("skip_event") or "skip_event" in [key.key() for key in evt.keys()]:
       print "Skipping event",ts
       self.debug_write("psana_skip", "skip")
+      t1 = py_time.time()
+      report_processing()
       return
 
     print "Accepted", ts
     self.params = copy.deepcopy(self.params_cache)
+
+    t1 = py_time.time()
 
     # the data needs to have already been processed and put into the event by psana
     if self.params.format.file_format == 'cbf':
@@ -926,6 +962,8 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       if data is None:
         print "No data"
         self.debug_write("no_data", "skip")
+        t2 = py_time.time()
+        report_processing()
         return
 
       if self.params.format.cbf.override_distance is None:
@@ -936,6 +974,8 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
         if distance is None:
           print "No distance, skipping shot"
           self.debug_write("no_distance", "skip")
+          t2 = py_time.time()
+          report_processing()
           return
       else:
         distance = self.params.format.cbf.override_distance
@@ -945,6 +985,8 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
         if wavelength is None:
           print "No wavelength, skipping shot"
           self.debug_write("no_wavelength", "skip")
+          t2 = py_time.time()
+          report_processing()
           return
       else:
         wavelength = 12398.4187/self.params.format.cbf.override_energy
@@ -952,6 +994,8 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     if self.params.format.file_format == 'pickle':
       image_dict = evt.get(self.params.format.pickle.out_key)
       data = image_dict['DATA']
+
+    t2 = py_time.time()
 
     self.timestamp = timestamp = t = ts
     s = t[0:4] + t[5:7] + t[8:10] + t[11:13] + t[14:16] + t[17:19] + t[20:23]
@@ -987,6 +1031,8 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
 
     self.tag = s # used when writing integration pickle
 
+    t3 = py_time.time()
+
     if self.params.dispatch.dump_all:
       self.save_image(dxtbx_img, self.params, os.path.join(self.params.output.output_dir, "shot-" + s))
 
@@ -1000,6 +1046,8 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
     if self.params.dispatch.estimate_gain_only:
       from dials.command_line.estimate_gain import estimate_gain
       estimate_gain(imgset)
+      t4 = py_time.time()
+      report_processing()
       return
 
     # Two values from a radial average can be stored by mod_radial_average. If present, retrieve them here
@@ -1012,17 +1060,25 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       if tt_low is not None or tt_high is not None:
         print "Warning, mod_radial_average is being used while also using xtc_process radial averaging. mod_radial_averaging results will not be logged to the database."
 
+    t4 = py_time.time()
+
     datablock = DataBlockFactory.from_imageset(imgset)[0]
 
     try:
       self.pre_process(datablock)
     except Exception, e:
       self.debug_write("preprocess_exception", "fail")
+      t5 = py_time.time()
+      report_processing()
       return
 
     if not self.params.dispatch.find_spots:
       self.debug_write("data_loaded", "done")
+      t5 = py_time.time()
+      report_processing()
       return
+
+    t5 = py_time.time()
 
     # before calling DIALS for processing, set output paths according to the templates
     if not self.params.output.composite_output:
@@ -1046,6 +1102,8 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       else:
         print "Image not previously indexed, skipping."
         self.debug_write("not_previously_indexed", "stop")
+        t6 = py_time.time()
+        report_processing()
         return
 
     # Load a dials mask from the trusted range and psana mask
@@ -1066,13 +1124,19 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       import traceback; traceback.print_exc()
       print str(e), "event", timestamp
       self.debug_write("spotfinding_exception", "fail")
+      t6 = py_time.time()
+      report_processing()
       return
+
+    t6 = py_time.time()
 
     print "Found %d bright spots"%len(observed)
 
     if self.params.dispatch.hit_finder.enable and len(observed) < self.params.dispatch.hit_finder.minimum_number_of_reflections:
       print "Not enough spots to index"
       self.debug_write("not_enough_spots_%d"%len(observed), "stop")
+      t7 = py_time.time()
+      report_processing()
       return
 
     self.restore_ranges(dxtbx_img)
@@ -1099,7 +1163,11 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
 
     if not self.params.dispatch.index:
       self.debug_write("strong_shot_%d"%len(observed), "done")
+      t7 = py_time.time()
+      report_processing()
       return
+
+    t7 = py_time.time()
 
     # index and refine
     self.debug_write("index_start")
@@ -1109,6 +1177,8 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       import traceback; traceback.print_exc()
       print str(e), "event", timestamp
       self.debug_write("indexing_failed_%d"%len(observed), "stop")
+      t8 = py_time.time()
+      report_processing()
       return
 
     if self.params.dispatch.dump_indexed:
@@ -1124,12 +1194,16 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
 
     self.debug_write("refine_start")
 
+    t8 = py_time.time()
+
     try:
       experiments, indexed = self.refine(experiments, indexed)
     except Exception, e:
       import traceback; traceback.print_exc()
       print str(e), "event", timestamp
       self.debug_write("refine_failed_%d"%len(indexed), "fail")
+      t9 = py_time.time()
+      report_processing()
       return
 
     if self.params.dispatch.reindex_strong:
@@ -1140,11 +1214,17 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
         import traceback; traceback.print_exc()
         print str(e), "event", timestamp
         self.debug_write("reindexstrong_failed_%d"%len(indexed), "fail")
+        t9 = py_time.time()
+        report_processing()
         return
 
     if not self.params.dispatch.integrate:
       self.debug_write("index_ok_%d"%len(indexed), "done")
+      t9 = py_time.time()
+      report_processing()
       return
+
+    t9 = py_time.time()
 
     # integrate
     self.debug_write("integrate_start")
@@ -1171,10 +1251,15 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       import traceback; traceback.print_exc()
       print str(e), "event", timestamp
       self.debug_write("integrate_failed_%d"%len(indexed), "fail")
+      t10 = py_time.time()
+      report_processing()
       return
     self.restore_ranges(dxtbx_img)
 
     self.debug_write("integrate_ok_%d"%len(integrated), "done")
+
+    t10 = py_time.time()
+    report_processing()
 
   def save_image(self, image, params, root_path):
     """ Save an image, in either cbf or pickle format.
