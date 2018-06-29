@@ -700,7 +700,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
         # use a client/server approach to be sure every process is busy as much as possible
         # only do this if there are more than 2 processes, as one process will be a server
         try:
-          if rank == 0:
+          def server():
             # server process
             self.mpi_log_write("MPI START\n")
             for nevt, evt in enumerate(run.events()):
@@ -720,7 +720,7 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
               self.mpi_log_write("Sending stop to %d\n"%rankreq)
               comm.send('endrun',dest=rankreq)
             self.mpi_log_write("All stops sent.")
-          else:
+          def client():
             # client process
             while True:
               # inform the server this process is ready for an event
@@ -738,6 +738,14 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
               except Exception, e:
                 print "Rank %d unhandled exception processing event"%rank, str(e)
               print "Rank %d event processed"%rank
+          if rank == 0:
+            server()
+          else:
+            import cProfile
+            prof = cProfile.Profile()
+            prof.runcall(client)
+            prof.print_stats()
+            prof.dump_stats('stats_%d.txt' % rank)
         except Exception, e:
           print "Error caught in main loop"
           print str(e)
