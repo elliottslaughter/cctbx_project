@@ -4,19 +4,25 @@ from __future__ import division
 # LIBTBX_SET_DISPATCHER_NAME cctbx.xfel.xtc_process
 #
 import sys
-print 'Running xtc_process.py'
+print 'Running 1 xtc_process.py (before import psana)'
 sys.stdout.flush()
 try:
   import psana
 except ImportError:
   pass # for running at home without psdm build
+print 'Running 2 xtc_process.py (after import psana, before import os)'
+sys.stdout.flush()
 import os
+print 'Running 3 xtc_process.py (after import os, before import psana_legion)'
+sys.stdout.flush()
 if os.environ.get('PSANA_FRAMEWORK') == 'mpi':
     import psana_mpi as psana_legion
     legion = None
 else:
     import psana_legion
     import legion
+print 'Running 4 xtc_process.py (after import psana_legion)'
+sys.stdout.flush()
 from xfel.cftbx.detector import cspad_cbf_tbx
 from xfel.cxi.cspad_ana import cspad_tbx, rayonix_tbx
 import pycbf, os, sys, copy, socket
