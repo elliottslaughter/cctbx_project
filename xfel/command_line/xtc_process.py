@@ -1,11 +1,11 @@
-import sys
-print 'Running xtc_process.py'
-sys.stdout.flush()
 from __future__ import division
 # -*- Mode: Python; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 8 -*-
 #
 # LIBTBX_SET_DISPATCHER_NAME cctbx.xfel.xtc_process
 #
+import sys
+print 'Running xtc_process.py'
+sys.stdout.flush()
 try:
   import psana
 except ImportError:
