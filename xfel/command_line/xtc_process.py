@@ -1,3 +1,6 @@
+import sys
+print 'Running xtc_process.py'
+sys.stdout.flush()
 from __future__ import division
 # -*- Mode: Python; c-basic-offset: 2; indent-tabs-mode: nil; tab-width: 8 -*-
 #
@@ -1294,11 +1297,17 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
 
     super(InMemScript, self).finalize()
 
+print 'In xtc_process.py, before Legion hack'
+sys.stdout.flush()
+
 # Hack: Pretend we're running the script directly (even though we're not).
 if legion is not None:
   sys.argv = legion.input_args(filter_runtime_options=True)
   sys.argv = ["cctbx.xfel.xtc_process"] + sys.argv[1:]
   __name__ = "__main__"
+
+print 'In xtc_process.py, before if __name__ == __main__'
+sys.stdout.flush()
 
 if __name__ == "__main__":
   from dials.util import halraiser
@@ -1307,3 +1316,6 @@ if __name__ == "__main__":
     script.run()
   except Exception as e:
     halraiser(e)
+
+print 'Bottom of xtc_process.py'
+sys.stdout.flush()
