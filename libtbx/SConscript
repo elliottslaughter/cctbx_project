@@ -1222,6 +1222,7 @@ def enable_cuda_if_possible():
     cc_flags = ' '.join(cc_flags)
     env_base['NVCCFLAGS'] = ['-gencode', 'arch=compute_35,code=sm_35',
                              '-gencode', 'arch=compute_52,code=sm_52',
+                             '-gencode', 'arch=compute_60,code=sm_60',
                              '-gencode', 'arch=compute_61,code=sm_61',
                              '-gencode', 'arch=compute_70,code=sm_70',
                              '-use_fast_math','--shared',
