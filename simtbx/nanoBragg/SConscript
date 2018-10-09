@@ -27,6 +27,9 @@ if (env_etc.enable_cuda):
   Import("env_boost_python_ext")
   env_bpl = env_boost_python_ext.Clone()
 
+  # Hack: For some reason these aren't being added automatically.
+  env_bpl.Prepend(NVCCFLAGS=[x for x in env_bpl["CXXFLAGS"] if x != '-pthread'])
+
   # For now do all calculations in double precision to agree with CPU tests
   env_bpl.Prepend(NVCCFLAGS=["-DCUDAREAL=double"])
 
